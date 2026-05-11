@@ -29,7 +29,7 @@ client.on('message', (topic, message) => {
 	if (topic === 'esp32/commands') {
 		const command = message.toString();
 		console.log('🕹️ Nhận lệnh từ ESP32:', command);
-		
+		client.publish('esp32/feedback', 'ACK');
 		// Ví dụ: Nếu ESP32 gửi "RESET", bạn có thể khởi động lại stream hoặc gọi API Lichess
 		if (command === 'RESET') {
 			// Thực hiện hành động điều khiển ở đây
