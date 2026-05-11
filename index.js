@@ -17,8 +17,46 @@ const client = mqtt.connect(MQTT_URL, {
 
 client.on('connect', () => {
     console.log('✅ Connected to HiveMQ Cloud');
+    
+    // Đăng ký nhận tin nhắn từ topic điều khiển của ESP32
+    client.subscribe('esp32/commands');
+    
     startLichessStream();
 });
+
+// Xử lý tin nhắn đến từ ESP32
+client.on('message', (topic, message) => {
+	if (topic === 'esp32/commands') {
+		const command = message.toString();
+		console.log('🕹️ Nhận lệnh từ ESP32:', command);
+		
+		// Ví dụ: Nếu ESP32 gửi "RESET", bạn có thể khởi động lại stream hoặc gọi API Lichess
+		if (command === 'RESET') {
+			// Thực hiện hành động điều khiển ở đây
+		}
+	}
+});
+
+// Hàm này lắng nghe chi tiết 1 trận đấu cụ thể
+async function listenToGame(gameId) {
+	const res = await fetch(`https://lichess.org/api/board/game/stream/${gameId}`, {
+		headers: { 'Authorization': `Bearer ${LICHESS_TOKEN}` }
+	});
+
+	res.body.on('data', (chunk) => {
+		const data = chunk.toString().trim();
+		if (data) {
+			const gameUpdate = JSON.parse(data);
+			if (gameUpdate.type === 'gameState') {
+				console.log('Nước đi mới:', gameUpdate.moves);
+				client.publish('chess/status', JSON.stringify({
+					id: gameId,
+					moves: gameUpdate.moves // Gửi danh sách nước đi về ESP32
+				}));
+			}
+		}
+	});
+}
 
 // 3. Stream from Lichess
 async function startLichessStream() {
@@ -45,6 +83,9 @@ async function startLichessStream() {
                     id: event.game?.id || 'none',
                     status: event.game?.status?.name || 'active'
                 }));
+                if(event.type == 'gameStart') {
+					listenToGame(event.game.id);
+				}
             } catch (e) {
                 // Ignore heartbeats (empty lines)
             }
